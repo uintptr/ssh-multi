@@ -1,6 +1,7 @@
 use clap::Parser;
 use nix::sys::socket::{
-    self, AddressFamily, ControlMessage, MsgFlags, SockFlag, SockaddrIn, connect, sendmsg, socket,
+    self, AddressFamily, ControlMessage, MsgFlags, SockFlag, SockaddrIn, SockaddrIn6, connect,
+    sendmsg, socket,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
@@ -9,7 +10,6 @@ use std::{
     net::{SocketAddr, ToSocketAddrs},
     os::fd::{AsRawFd, OwnedFd},
     process::exit,
-    str::FromStr,
     sync::Mutex,
 };
 
@@ -18,15 +18,11 @@ type Result<T> = core::result::Result<T, Box<dyn Error>>;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct UserArgs {
-    /// Connection timeout in milliseconds
-    #[clap(long, default_value = "2000")]
-    timeout: u64,
-
     /// target list
     hosts: Vec<String>,
 }
 
-fn connect_to_targets(addresses: Vec<SocketAddr>, _timeout_ms: u64) -> Result<OwnedFd> {
+fn connect_to_targets(addresses: Vec<SocketAddr>) -> Result<OwnedFd> {
     for address in addresses {
         let af = match address.is_ipv4() {
             true => AddressFamily::Inet,
@@ -35,9 +31,18 @@ fn connect_to_targets(addresses: Vec<SocketAddr>, _timeout_ms: u64) -> Result<Ow
 
         let socket = socket(af, socket::SockType::Stream, SockFlag::empty(), None)?;
 
-        let addr = SockaddrIn::from_str(&address.to_string())?;
+        let ret = match address {
+            SocketAddr::V4(addr4) => {
+                let addr = SockaddrIn::from(addr4);
+                connect(socket.as_raw_fd(), &addr)
+            }
+            SocketAddr::V6(add6) => {
+                let addr = SockaddrIn6::from(add6);
+                connect(socket.as_raw_fd(), &addr)
+            }
+        };
 
-        if connect(socket.as_raw_fd(), &addr).is_ok() {
+        if ret.is_ok() {
             return Ok(socket);
         }
     }
@@ -80,7 +85,7 @@ fn main() -> Result<()> {
     //
     args.hosts.par_iter().for_each(|target| {
         if let Ok(addrs) = parse_target(target) {
-            if let Ok(socket) = connect_to_targets(addrs, args.timeout) {
+            if let Ok(socket) = connect_to_targets(addrs) {
                 if passfd_mutex.lock().is_ok() {
                     match pass_fd(socket) {
                         Ok(_) => exit(0),
