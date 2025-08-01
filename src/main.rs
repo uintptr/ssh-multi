@@ -8,6 +8,7 @@ use std::{
     io::IoSlice,
     net::{SocketAddr, ToSocketAddrs},
     os::fd::{AsRawFd, OwnedFd},
+    process::exit,
     str::FromStr,
     sync::Mutex,
 };
@@ -41,7 +42,7 @@ fn connect_to_targets(addresses: Vec<SocketAddr>, _timeout_ms: u64) -> Result<Ow
         }
     }
 
-    Err("Not Connected".into())
+    Err("Unable to connect".into())
 }
 
 fn parse_target(target: &str) -> Result<Vec<SocketAddr>> {
@@ -52,7 +53,7 @@ fn parse_target(target: &str) -> Result<Vec<SocketAddr>> {
 
     match target.to_socket_addrs() {
         Ok(v) => Ok(v.collect()),
-        Err(_) => Err("Invalid Target".into()),
+        Err(_) => Err(format!("Invalid host spec \"{target}\"").into()),
     }
 }
 
@@ -73,14 +74,16 @@ fn main() -> Result<()> {
 
     let passfd_mutex = Mutex::new(0);
 
-    // this is a race, we try all hosts at once and the first one that
-    // gets to the pass_fd() functions wins and we exit the process
+    //
+    // this'll try all the target at once (par_iter) and whichever
+    // gets to the pass_fd() function wins and we exit() the process
+    //
     args.hosts.par_iter().for_each(|target| {
         if let Ok(addrs) = parse_target(target) {
             if let Ok(socket) = connect_to_targets(addrs, args.timeout) {
                 if passfd_mutex.lock().is_ok() {
                     match pass_fd(socket) {
-                        Ok(_) => std::process::exit(0),
+                        Ok(_) => exit(0),
                         Err(e) => eprintln!("{e}"),
                     }
                 }
