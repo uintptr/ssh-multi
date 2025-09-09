@@ -31,6 +31,7 @@ fn connect_to_targets(addresses: Vec<SocketAddr>) -> Result<TcpStream> {
 
     Err("Unable to connect".into())
 }
+
 fn parse_target(target: &str) -> Result<Vec<SocketAddr>> {
     let target = match target.contains(":") {
         true => target,
@@ -59,7 +60,6 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
             local = stdin_reader.read(&mut local_buffer) => {
                 match local {
                     Ok(len) => {
-
                         if let Err(e) = remote_stream.write_all(&local_buffer[0..len]).await{
                             break Err(format!("error: {e}").into())
                         }
@@ -72,7 +72,6 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
             remote = remote_stream.read(&mut remote_buffer) => {
                 match remote {
                     Ok(len) => {
-
                         if let Err(e) = stdout_writer.write_all(&remote_buffer[0..len]).await{
                             break Err(format!("error: {e}").into())
                         }
@@ -101,7 +100,8 @@ fn main() -> Result<()> {
 
     //
     // this'll try all the target at once (par_iter) and whichever
-    // gets to the pass_fd() function wins and we exit() the process
+    // connects first will enter the IO loop and the other ones
+    // are dropped / disconnected
     //
     args.hosts.par_iter().for_each(|target| {
         if let Ok(addrs) = parse_target(target) {
