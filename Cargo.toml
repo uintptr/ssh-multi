@@ -1,11 +1,11 @@
 [package]
 name = "ssh-multi"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.43", features = ["derive"] }
-rayon = "1.10.0"
+clap = { version = "4.5.47", features = ["derive"] }
+rayon = "1.11.0"
 tokio = { version = "1.47.1", features = ["io-std", "io-util", "macros", "net", "rt", "rt-multi-thread"] }
 
 [profile.release]
