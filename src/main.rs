@@ -1,19 +1,20 @@
 use clap::Parser;
-use nix::sys::socket::{
-    self, AddressFamily, ControlMessage, MsgFlags, SockFlag, SockaddrIn, SockaddrIn6, connect,
-    sendmsg, socket,
-};
+
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     error::Error,
-    io::IoSlice,
-    net::{SocketAddr, ToSocketAddrs},
-    os::fd::{AsRawFd, OwnedFd},
-    process::exit,
-    sync::Mutex,
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
+    sync::{Arc, atomic::AtomicBool},
+};
+use tokio::{
+    io::{self, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
+    runtime::Runtime,
+    select,
 };
 
 type Result<T> = core::result::Result<T, Box<dyn Error>>;
+
+const IO_BUFFER_SIZE: usize = 8 * 1024;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -22,34 +23,14 @@ struct UserArgs {
     hosts: Vec<String>,
 }
 
-fn connect_to_targets(addresses: Vec<SocketAddr>) -> Result<OwnedFd> {
+fn connect_to_targets(addresses: Vec<SocketAddr>) -> Result<TcpStream> {
     for address in addresses {
-        let af = match address.is_ipv4() {
-            true => AddressFamily::Inet,
-            false => AddressFamily::Inet6,
-        };
-
-        let socket = socket(af, socket::SockType::Stream, SockFlag::empty(), None)?;
-
-        let ret = match address {
-            SocketAddr::V4(addr4) => {
-                let addr = SockaddrIn::from(addr4);
-                connect(socket.as_raw_fd(), &addr)
-            }
-            SocketAddr::V6(add6) => {
-                let addr = SockaddrIn6::from(add6);
-                connect(socket.as_raw_fd(), &addr)
-            }
-        };
-
-        if ret.is_ok() {
-            return Ok(socket);
-        }
+        let stream = TcpStream::connect(address)?;
+        return Ok(stream);
     }
 
     Err("Unable to connect".into())
 }
-
 fn parse_target(target: &str) -> Result<Vec<SocketAddr>> {
     let target = match target.contains(":") {
         true => target,
@@ -62,12 +43,51 @@ fn parse_target(target: &str) -> Result<Vec<SocketAddr>> {
     }
 }
 
-fn pass_fd(fd: OwnedFd) -> Result<()> {
-    let iov = [IoSlice::new(b"\0")];
-    let fds = [fd.as_raw_fd()];
-    let cmsg = ControlMessage::ScmRights(&fds);
-    sendmsg::<()>(1, &iov, &[cmsg], MsgFlags::empty(), None)?;
-    Ok(())
+async fn io_loop(stream: TcpStream) -> Result<()> {
+    stream.set_nonblocking(true).unwrap();
+
+    let mut local_buffer = vec![0u8; IO_BUFFER_SIZE];
+    let mut remote_buffer = vec![0u8; IO_BUFFER_SIZE];
+
+    let mut remote_stream = tokio::net::TcpStream::from_std(stream).unwrap();
+
+    let mut stdin_reader = BufReader::new(io::stdin());
+    let mut stdout_writer = BufWriter::new(io::stdout());
+
+    loop {
+        select! {
+            local = stdin_reader.read(&mut local_buffer) => {
+                match local {
+                    Ok(len) => {
+
+                        if let Err(e) = remote_stream.write_all(&local_buffer[0..len]).await{
+                            break Err(format!("error: {e}").into())
+                        }
+                    }
+                    Err(e) => {
+                        break Err(format!("error: {e}").into())
+                    }
+                }
+            }
+            remote = remote_stream.read(&mut remote_buffer) => {
+                match remote {
+                    Ok(len) => {
+
+                        if let Err(e) = stdout_writer.write_all(&remote_buffer[0..len]).await{
+                            break Err(format!("error: {e}").into())
+                        }
+
+                        if let Err(e) = stdout_writer.flush().await{
+                            break Err(format!("error: {e}").into())
+                        }
+                    }
+                    Err(e) => {
+                        break Err(format!("error: {e}").into())
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -77,7 +97,7 @@ fn main() -> Result<()> {
         return Err("Host Missing".into());
     }
 
-    let passfd_mutex = Mutex::new(0);
+    let connected = Arc::new(AtomicBool::new(false));
 
     //
     // this'll try all the target at once (par_iter) and whichever
@@ -85,16 +105,22 @@ fn main() -> Result<()> {
     //
     args.hosts.par_iter().for_each(|target| {
         if let Ok(addrs) = parse_target(target) {
-            if let Ok(socket) = connect_to_targets(addrs) {
-                if passfd_mutex.lock().is_ok() {
-                    match pass_fd(socket) {
-                        Ok(_) => exit(0),
-                        Err(e) => eprintln!("{e}"),
-                    }
+            if let Ok(stream) = connect_to_targets(addrs) {
+                if connected
+                    .compare_exchange(
+                        false,
+                        true,
+                        std::sync::atomic::Ordering::Acquire,
+                        std::sync::atomic::Ordering::Relaxed,
+                    )
+                    .is_ok()
+                {
+                    let rt = Runtime::new().unwrap();
+                    rt.block_on(io_loop(stream)).unwrap();
                 }
             }
         }
     });
 
-    Err("Not Connected".into())
+    Ok(())
 }
