@@ -25,8 +25,9 @@ struct UserArgs {
 
 fn connect_to_targets(addresses: Vec<SocketAddr>) -> Result<TcpStream> {
     for address in addresses {
-        let stream = TcpStream::connect(address)?;
-        return Ok(stream);
+        if let Ok(stream) = TcpStream::connect(address) {
+            return Ok(stream);
+        }
     }
 
     Err("Unable to connect".into())
@@ -61,7 +62,7 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
                 match local {
                     Ok(len) => {
 
-                        if 0 == len{
+                        if 0 == len {
                             break Err("EOF".into());
                         }
 
@@ -78,7 +79,7 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
                 match remote {
                     Ok(len) => {
 
-                        if 0 == len{
+                        if 0 == len {
                             break Err("EOF".into());
                         }
 
@@ -114,21 +115,19 @@ fn main() -> Result<()> {
     // are dropped / disconnected
     //
     args.hosts.par_iter().for_each(|target| {
-        if let Ok(addrs) = parse_target(target) {
-            if let Ok(stream) = connect_to_targets(addrs) {
-                if connected
-                    .compare_exchange(
-                        false,
-                        true,
-                        std::sync::atomic::Ordering::Acquire,
-                        std::sync::atomic::Ordering::Relaxed,
-                    )
-                    .is_ok()
-                {
-                    let rt = Runtime::new().unwrap();
-                    rt.block_on(io_loop(stream)).unwrap();
-                }
-            }
+        if let Ok(addrs) = parse_target(target)
+            && let Ok(stream) = connect_to_targets(addrs)
+            && connected
+                .compare_exchange(
+                    false,
+                    true,
+                    std::sync::atomic::Ordering::Acquire,
+                    std::sync::atomic::Ordering::Relaxed,
+                )
+                .is_ok()
+        {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(io_loop(stream)).unwrap();
         }
     });
 
