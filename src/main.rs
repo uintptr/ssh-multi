@@ -4,7 +4,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     error::Error,
     net::{SocketAddr, TcpStream, ToSocketAddrs},
-    sync::{Arc, atomic::AtomicBool},
+    sync::atomic::AtomicBool,
 };
 use tokio::{
     io::{self, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
@@ -107,7 +107,7 @@ fn main() -> Result<()> {
         return Err("Host Missing".into());
     }
 
-    let connected = Arc::new(AtomicBool::new(false));
+    let connected = AtomicBool::new(false);
 
     //
     // this'll try all the target at once (par_iter) and whichever
