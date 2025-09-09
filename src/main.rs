@@ -60,6 +60,11 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
             local = stdin_reader.read(&mut local_buffer) => {
                 match local {
                     Ok(len) => {
+
+                        if 0 == len{
+                            break Err("EOF".into());
+                        }
+
                         if let Err(e) = remote_stream.write_all(&local_buffer[0..len]).await{
                             break Err(format!("error: {e}").into())
                         }
@@ -72,6 +77,11 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
             remote = remote_stream.read(&mut remote_buffer) => {
                 match remote {
                     Ok(len) => {
+
+                        if 0 == len{
+                            break Err("EOF".into());
+                        }
+
                         if let Err(e) = stdout_writer.write_all(&remote_buffer[0..len]).await{
                             break Err(format!("error: {e}").into())
                         }
