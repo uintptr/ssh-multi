@@ -64,5 +64,5 @@ jobs:
             - name: Upload binary
               uses: actions/upload-artifact@v4
               with:
-                  name: ssh-multi-windows.exe
+                  name: ssh-multi-windows
                   path: target/release/ssh-multi.exe
