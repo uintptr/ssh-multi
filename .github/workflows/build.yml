@@ -45,3 +45,24 @@ jobs:
               with:
                   name: ssh-multi-macos
                   path: target/release/ssh-multi
+
+    build_windows:
+        runs-on: windows-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+
+            - name: Build
+              run: |
+                  cargo build --release
+
+            - name: Upload binary
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ssh-multi-windows.exe
+                  path: target/release/ssh-multi.exe
