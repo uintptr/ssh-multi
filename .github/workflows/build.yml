@@ -3,8 +3,29 @@ on:
     workflow_dispatch:
 
 jobs:
-    build_linux:
-        runs-on: ubuntu-latest
+    build_all:
+        strategy:
+            matrix:
+                platform:
+                [
+                    "linux-x86_64",
+                    "macos-aarch64",
+                    "windows-x86_64"
+                ]
+                include:
+                    platform: linux-x86_64
+                    os: ubuntu-latest
+                    rust_target: x86_64-unknown-linux-musl
+
+                    platform: macos-aarch64
+                    os: macos-latest
+                    rust_target: "aarch64-apple-darwin"
+
+                    platform: windows-x86_64
+                    os: windows-latest
+                    rust_target: "x86_64-pc-windows-msvc"
+
+        runs-on: ${{ matrix.os }}
 
         steps:
             - uses: actions/checkout@v4
@@ -13,56 +34,13 @@ jobs:
               uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
-
             - name: Build
               run: |
-                  rustup target  add x86_64-unknown-linux-musl
-                  cargo build --release --target x86_64-unknown-linux-musl
+                  rustup target  add ${{ matrix.rust_target }}
+                  cargo build --release --target ${{ matrix.rust_target }}
 
             - name: Upload binary
               uses: actions/upload-artifact@v4
               with:
-                  name: ssh-multi-linux
-                  path: target/x86_64-unknown-linux-musl/release/ssh-multi
-
-    build_macos:
-        runs-on: macos-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Setup Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-
-            - name: Build
-              run: |
-                  cargo build --release
-
-            - name: Upload binary
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ssh-multi-macos
-                  path: target/release/ssh-multi
-
-    build_windows:
-        runs-on: windows-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Setup Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-
-            - name: Build
-              run: |
-                  cargo build --release
-
-            - name: Upload binary
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ssh-multi-windows
-                  path: target/release/ssh-multi.exe
+                  name: ssh-multi-${{ matrix.platform }}
+                  path: target/${{ matrix.platform }}/release/ssh-multi
