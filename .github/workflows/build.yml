@@ -29,6 +29,7 @@ jobs:
               uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
+
             - name: Build
               run: |
                   rustup target  add ${{ matrix.rust_target }}
@@ -38,4 +39,4 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: ssh-multi-${{ matrix.platform }}
-                  path: target/${{ matrix.platform }}/release/ssh-multi
+                  path: target/${{ matrix.rust_target }}/release/ssh-multi
