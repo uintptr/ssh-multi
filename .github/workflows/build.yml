@@ -6,24 +6,19 @@ jobs:
     build_all:
         strategy:
             matrix:
-                platform:
-                [
-                    "linux-x86_64",
-                    "macos-aarch64",
-                    "windows-x86_64"
-                ]
+                platform: ["linux-x86_64", "macos-aarch64", "windows-x86_64"]
                 include:
-                    platform: linux-x86_64
-                    os: ubuntu-latest
-                    rust_target: x86_64-unknown-linux-musl
+                    - platform: linux-x86_64
+                      os: ubuntu-latest
+                      rust_target: x86_64-unknown-linux-musl
 
-                    platform: macos-aarch64
-                    os: macos-latest
-                    rust_target: "aarch64-apple-darwin"
+                    - platform: macos-aarch64
+                      os: macos-latest
+                      rust_target: "aarch64-apple-darwin"
 
-                    platform: windows-x86_64
-                    os: windows-latest
-                    rust_target: "x86_64-pc-windows-msvc"
+                    - platform: windows-x86_64
+                      os: windows-latest
+                      rust_target: "x86_64-pc-windows-msvc"
 
         runs-on: ${{ matrix.os }}
 
