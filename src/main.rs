@@ -127,7 +127,7 @@ fn main() -> Result<()> {
                 .is_ok()
         {
             let rt = Runtime::new().unwrap();
-            rt.block_on(io_loop(stream)).unwrap();
+            let _ = rt.block_on(async { io_loop(stream).await });
         }
     });
 
