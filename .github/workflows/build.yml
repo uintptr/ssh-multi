@@ -11,14 +11,17 @@ jobs:
                     - platform: linux-x86_64
                       os: ubuntu-latest
                       rust_target: x86_64-unknown-linux-musl
+                      ext: ""
 
                     - platform: macos-aarch64
                       os: macos-latest
                       rust_target: "aarch64-apple-darwin"
+                      ext: ""
 
                     - platform: windows-x86_64
                       os: windows-latest
                       rust_target: "x86_64-pc-windows-msvc"
+                      ext: ".exe"
 
         runs-on: ${{ matrix.os }}
 
@@ -39,4 +42,4 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: ssh-multi-${{ matrix.platform }}
-                  path: target/${{ matrix.rust_target }}/release/ssh-multi
+                  path: target/${{ matrix.rust_target }}/release/ssh-multi${{ matrix.ext }}
