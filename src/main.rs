@@ -7,14 +7,14 @@ use std::{
     sync::atomic::AtomicBool,
 };
 use tokio::{
-    io::{self, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
+    io::{self, AsyncReadExt, AsyncWriteExt},
     runtime::Runtime,
     select,
 };
 
 type Result<T> = core::result::Result<T, Box<dyn Error>>;
 
-const IO_BUFFER_SIZE: usize = 8 * 1024;
+const IO_BUFFER_SIZE: usize = 64 * 1024;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -47,18 +47,19 @@ fn parse_target(target: &str) -> Result<Vec<SocketAddr>> {
 
 async fn io_loop(stream: TcpStream) -> Result<()> {
     stream.set_nonblocking(true).unwrap();
+    stream.set_nodelay(true).unwrap();
 
     let mut local_buffer = vec![0u8; IO_BUFFER_SIZE];
     let mut remote_buffer = vec![0u8; IO_BUFFER_SIZE];
 
     let mut remote_stream = tokio::net::TcpStream::from_std(stream).unwrap();
 
-    let mut stdin_reader = BufReader::new(io::stdin());
-    let mut stdout_writer = BufWriter::new(io::stdout());
+    let mut stdin = io::stdin();
+    let mut stdout = io::stdout();
 
     loop {
         select! {
-            local = stdin_reader.read(&mut local_buffer) => {
+            local = stdin.read(&mut local_buffer) => {
                 match local {
                     Ok(len) => {
 
@@ -83,11 +84,7 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
                             break Err("EOF".into());
                         }
 
-                        if let Err(e) = stdout_writer.write_all(&remote_buffer[0..len]).await{
-                            break Err(format!("error: {e}").into())
-                        }
-
-                        if let Err(e) = stdout_writer.flush().await{
+                        if let Err(e) = stdout.write_all(&remote_buffer[0..len]).await{
                             break Err(format!("error: {e}").into())
                         }
                     }
