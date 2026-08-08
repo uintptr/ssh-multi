@@ -87,6 +87,15 @@ async fn io_loop(stream: TcpStream) -> Result<()> {
                         if let Err(e) = stdout.write_all(&remote_buffer[0..len]).await{
                             break Err(format!("error: {e}").into())
                         }
+
+                        //
+                        // stdout is line buffered. without an explicit flush
+                        // binary ssh packets sit in the buffer until a newline
+                        // shows up, stalling the connection
+                        //
+                        if let Err(e) = stdout.flush().await{
+                            break Err(format!("error: {e}").into())
+                        }
                     }
                     Err(e) => {
                         break Err(format!("error: {e}").into())

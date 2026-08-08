@@ -8,7 +8,18 @@ uses whichever connection responds fastest.
 
 ## Install
 
+### Quick install (Linux/macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/uintptr/ssh-multi/main/scripts/install.sh | bash
 ```
+
+Installs the latest release binary to `~/.local/bin`. Linux x86_64 and macOS
+arm64 only.
+
+### From source
+
+```sh
 cargo install --git https://github.com/uintptr/ssh-multi
 ```
 

@@ -1,5 +1,7 @@
 name: build
 on:
+    push:
+        tags: ["*"]
     workflow_dispatch:
 
 jobs:
@@ -12,34 +14,62 @@ jobs:
                       os: ubuntu-latest
                       rust_target: x86_64-unknown-linux-musl
                       ext: ""
+                      asset: ssh-multi-linux
 
                     - platform: macos-aarch64
                       os: macos-latest
                       rust_target: "aarch64-apple-darwin"
                       ext: ""
+                      asset: ssh-multi-macos
 
                     - platform: windows-x86_64
                       os: windows-latest
                       rust_target: "x86_64-pc-windows-msvc"
                       ext: ".exe"
+                      asset: ssh-multi-windows.exe
 
         runs-on: ${{ matrix.os }}
 
         steps:
             - uses: actions/checkout@v4
 
-            - name: Setup Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
+            - name: Install Rust target
+              run: rustup target add ${{ matrix.rust_target }}
+
+            - name: Install Linux musl tools
+              if: matrix.rust_target == 'x86_64-unknown-linux-musl'
+              run: sudo apt-get update && sudo apt-get install -y musl-tools
 
             - name: Build
-              run: |
-                  rustup target  add ${{ matrix.rust_target }}
-                  cargo build --release --target ${{ matrix.rust_target }}
+              run: cargo build --release --target ${{ matrix.rust_target }}
+
+            - name: Rename binary for release
+              shell: bash
+              run: cp target/${{ matrix.rust_target }}/release/ssh-multi${{ matrix.ext }} ${{ matrix.asset }}
 
             - name: Upload binary
               uses: actions/upload-artifact@v4
               with:
-                  name: ssh-multi-${{ matrix.platform }}
-                  path: target/${{ matrix.rust_target }}/release/ssh-multi${{ matrix.ext }}
+                  name: binaries-${{ matrix.platform }}
+                  path: ${{ matrix.asset }}
+
+    release:
+        needs: build_all
+        if: startsWith(github.ref, 'refs/tags/')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - name: Download release artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: binaries-*
+                  path: artifacts
+                  merge-multiple: true
+
+            - name: Create Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: artifacts/*
+                  generate_release_notes: true
