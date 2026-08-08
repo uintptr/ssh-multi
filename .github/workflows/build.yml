@@ -8,13 +8,20 @@ jobs:
     build_all:
         strategy:
             matrix:
-                platform: ["linux-x86_64", "macos-aarch64", "windows-x86_64"]
+                platform:
+                    ["linux-x86_64", "linux-aarch64", "macos-aarch64", "windows-x86_64"]
                 include:
                     - platform: linux-x86_64
                       os: ubuntu-latest
                       rust_target: x86_64-unknown-linux-musl
                       ext: ""
                       asset: ssh-multi-linux
+
+                    - platform: linux-aarch64
+                      os: ubuntu-24.04-arm
+                      rust_target: aarch64-unknown-linux-musl
+                      ext: ""
+                      asset: ssh-multi-linux-arm64
 
                     - platform: macos-aarch64
                       os: macos-latest
@@ -37,7 +44,7 @@ jobs:
               run: rustup target add ${{ matrix.rust_target }}
 
             - name: Install Linux musl tools
-              if: matrix.rust_target == 'x86_64-unknown-linux-musl'
+              if: endsWith(matrix.rust_target, '-unknown-linux-musl')
               run: sudo apt-get update && sudo apt-get install -y musl-tools
 
             - name: Build

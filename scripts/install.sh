@@ -13,7 +13,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Detect the release asset name for this platform.
-# Releases ship one build per OS: Linux is x86_64 musl, macOS is arm64.
+# Releases ship x86_64 and arm64 musl builds for Linux, arm64 for macOS.
 detect_asset() {
     local os
 
@@ -40,14 +40,13 @@ detect_asset() {
     fi
 
     case "$(uname -m)" in
-        x86_64|amd64) ;;
+        x86_64|amd64)  echo "ssh-multi-linux" ;;
+        arm64|aarch64) echo "ssh-multi-linux-arm64" ;;
         *)
             echo "Error: Unsupported architecture for Linux: $(uname -m)" >&2
             exit 1
             ;;
     esac
-
-    echo "ssh-multi-linux"
 }
 
 # Get latest release tag from GitHub

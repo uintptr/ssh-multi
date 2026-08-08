@@ -14,8 +14,8 @@ uses whichever connection responds fastest.
 curl -fsSL https://raw.githubusercontent.com/uintptr/ssh-multi/main/scripts/install.sh | bash
 ```
 
-Installs the latest release binary to `~/.local/bin`. Linux x86_64 and macOS
-arm64 only.
+Installs the latest release binary to `~/.local/bin`. Linux x86_64, Linux
+arm64, and macOS arm64 only.
 
 ### From source
 
